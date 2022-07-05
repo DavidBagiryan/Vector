@@ -169,6 +169,46 @@ public:
             return;
         }
         RawMemory<T> new_data(new_capacity);
+        SafeMemoryTransfer(new_data);
+    }
+    
+    void Resize(size_t new_size) {
+        if (new_size < size_) {
+            std::destroy_n(data_.GetAddress() + new_size, size_ - new_size);
+        } 
+        else if (new_size > size_) {
+            size_t size = size_ == 0 ? 1 : size_;
+            while (new_size > data_.Capacity()) {
+                Reserve(size * 2);
+            }
+            std::uninitialized_value_construct_n(data_.GetAddress() + size_, new_size - size_);
+        }
+        size_ = new_size;
+    }
+    
+    template <typename F> // Forwarding reference
+    void PushBack(F&& value) {
+        if (size_ < Capacity()) {
+            new (data_ + size_) T(std::forward<F>(value));          
+        }
+        else if (size_ == Capacity()) {
+            RawMemory<T> new_data(size_ == 0 ? 1 : size_ * 2);
+            new (new_data + size_) T(std::forward<F>(value));
+            SafeMemoryTransfer(new_data);
+        }
+        ++size_;
+    }
+    
+    void PopBack() /* noexcept */ {
+        std::destroy_at(data_.GetAddress() + size_);
+        --size_;
+    }
+
+private:
+    RawMemory<T> data_;
+    size_t size_ = 0;
+    
+    void SafeMemoryTransfer(RawMemory<T>& new_data) {
         // constexpr оператор if будет вычислен во время компиляции
         if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
             std::uninitialized_move_n(data_.GetAddress(), size_, new_data.GetAddress());
@@ -178,9 +218,4 @@ public:
         std::destroy_n(data_.GetAddress(), size_);
         data_.Swap(new_data);
     }
-
-private:
-    RawMemory<T> data_;
-    size_t size_ = 0;
-
 };
