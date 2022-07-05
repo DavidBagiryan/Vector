@@ -1,9 +1,11 @@
 #pragma once
+
 #include <cassert>
 #include <cstdlib>
 #include <new>
 #include <utility>
 #include <memory>
+#include <algorithm>
 
 template <typename T>
 class RawMemory {
@@ -17,6 +19,19 @@ public:
 
     ~RawMemory() {
         Deallocate(buffer_);
+    }
+    
+    RawMemory(const RawMemory&) = delete;
+    RawMemory& operator=(const RawMemory& rhs) = delete;
+    RawMemory(RawMemory&& other) noexcept 
+    {
+        Swap(other);
+    }
+    RawMemory& operator=(RawMemory&& rhs) noexcept {
+        if (this != &rhs) {
+            Swap(rhs);
+        }
+        return *this;
     }
 
     T* operator+(size_t offset) noexcept {
@@ -81,7 +96,6 @@ public:
     {
         std::uninitialized_value_construct_n(data_.GetAddress(), size);
     }
-
     Vector(const Vector& other)
         : data_(other.size_)
         , size_(other.size_) 
@@ -91,6 +105,46 @@ public:
     
     ~Vector() {
         std::destroy_n(data_.GetAddress(), size_);
+    }
+    
+    Vector(Vector&& other) noexcept
+            : data_(std::move(other.data_))
+            , size_(other.size_)
+    {
+        other.size_ = 0;
+    }
+
+    Vector& operator=(const Vector& rhs) {
+        if (this != &rhs) {
+            if (rhs.size_ > data_.Capacity()) {
+                Vector rhs_copy(rhs);
+                Swap(rhs_copy);
+            } else {
+                if (rhs.size_ < size_) {
+                    std::copy_n(rhs.data_.GetAddress(), rhs.size_, data_.GetAddress());
+                    std::destroy_n(data_.GetAddress() + rhs.size_, size_ - rhs.size_);
+                }
+                else {
+                    std::copy_n(rhs.data_.GetAddress(), size_, data_.GetAddress());
+                    std::uninitialized_copy_n(rhs.data_.GetAddress() + size_, rhs.size_ - size_, data_.GetAddress() + size_);
+                }
+                size_ = rhs.size_;
+            }
+        }
+        return *this;
+    }
+    Vector& operator=(Vector&& rhs) noexcept {
+        if (this != &rhs) {
+            data_ = std::move(rhs.data_);
+            size_ = rhs.size_;
+            rhs.size_ = 0;
+        }
+        return *this;
+    }
+
+    void Swap(Vector& other) noexcept {
+        data_.Swap(other.data_);
+        std::swap(size_, other.size_);
     }
     
     size_t Size() const noexcept {
