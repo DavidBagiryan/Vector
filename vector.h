@@ -188,20 +188,26 @@ public:
     
     template <typename F> // Forwarding reference
     void PushBack(F&& value) {
-        if (size_ < Capacity()) {
-            new (data_ + size_) T(std::forward<F>(value));          
-        }
-        else if (size_ == Capacity()) {
-            RawMemory<T> new_data(size_ == 0 ? 1 : size_ * 2);
-            new (new_data + size_) T(std::forward<F>(value));
-            SafeMemoryTransfer(new_data);
-        }
-        ++size_;
+        EmplaceBack(std::forward<F>(value));
     }
     
     void PopBack() /* noexcept */ {
         std::destroy_at(data_.GetAddress() + size_);
         --size_;
+    }
+    
+    template <typename... Args>
+    T& EmplaceBack(Args&&... args) {
+        if (size_ < Capacity()) {
+            new (data_ + size_) T(std::forward<Args>(args)...);          
+        }
+        else if (size_ == Capacity()) {
+            RawMemory<T> new_data(size_ == 0 ? 1 : size_ * 2);
+            new (new_data + size_) T(std::forward<Args>(args)...);
+            SafeMemoryTransfer(new_data);
+        }
+        ++size_;
+        return data_[size_ - 1];
     }
 
 private:
