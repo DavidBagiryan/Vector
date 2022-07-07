@@ -234,6 +234,7 @@ public:
 
     template <typename... Args>
     iterator Emplace(const_iterator pos, Args&&... args) {
+        assert(pos >= cbegin() && pos <= cend());
         size_t pos_ind = pos - cbegin();
         if (Size() < Capacity()) {
             new (end()) T(std::forward<T>(*(end() - 1)));
@@ -265,6 +266,7 @@ public:
     }
     
     iterator Erase(const_iterator pos) /*noexcept(std::is_nothrow_move_assignable_v<T>)*/ {
+        assert(pos >= cbegin() && pos < cend());
         size_t i = pos - cbegin();
         std::move(begin() + i + 1, end(), begin() + i);
         std::destroy_at(data_.GetAddress() + Size() - 1);
